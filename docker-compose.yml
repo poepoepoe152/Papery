@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: papery-db
+    environment:
+      POSTGRES_USER: papery
+      POSTGRES_PASSWORD: papery
+      POSTGRES_DB: papery
+    ports:
+      - "5432:5432"
+    volumes:
+      - papery_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: papery-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://papery:papery@db:5432/papery
+      JWT_SECRET: dev-secret-change-me
+      CORS_ORIGINS: http://localhost:3000
+      SUPER_ADMIN_EMAIL: admin@papery.app
+      SUPER_ADMIN_PASSWORD: Admin123!
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: papery-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  papery_pgdata:
