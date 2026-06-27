@@ -22,7 +22,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://papery:papery@db:5432/papery
       JWT_SECRET: dev-secret-change-me
-      CORS_ORIGINS: http://localhost:3000
+      # Allow both localhost (same machine) and your LAN IP (phone/other devices).
+      CORS_ORIGINS: "http://localhost:3000,http://${HOST_IP:-localhost}:3000"
       SUPER_ADMIN_EMAIL: admin@papery.app
       SUPER_ADMIN_PASSWORD: Admin123!
     ports:
@@ -35,7 +36,9 @@ services:
     build: ./frontend
     container_name: papery-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Defaults to localhost; set HOST_IP to your computer's LAN IP to access
+      # the app from a phone on the same Wi-Fi (see .env.example).
+      NEXT_PUBLIC_API_URL: "http://${HOST_IP:-localhost}:8000"
     ports:
       - "3000:3000"
     depends_on:
