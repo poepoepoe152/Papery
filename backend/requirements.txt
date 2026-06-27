@@ -7,3 +7,12 @@ pydantic-settings==2.7.0
 email-validator==2.2.0
 PyJWT==2.10.1
 bcrypt==4.2.1
+python-multipart==0.0.20
+PyMuPDF==1.25.1
+python-docx==1.1.2
+Pillow==11.0.0
+pytesseract==0.3.13
+rapidfuzz==3.11.0
+python-dateutil==2.9.0.post0
+reportlab==4.2.5
+openpyxl==3.1.5

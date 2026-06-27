@@ -26,8 +26,11 @@ services:
       CORS_ORIGINS: "http://localhost:3000,http://${HOST_IP:-localhost}:3000"
       SUPER_ADMIN_EMAIL: admin@papery.app
       SUPER_ADMIN_PASSWORD: Admin123!
+      STORAGE_DIR: /app/uploads
     ports:
       - "8000:8000"
+    volumes:
+      - papery_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -46,3 +49,4 @@ services:
 
 volumes:
   papery_pgdata:
+  papery_uploads:

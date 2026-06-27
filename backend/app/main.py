@@ -1,4 +1,4 @@
-"""Papery API — FastAPI application entrypoint (Phase 2 foundation)."""
+"""Papery API — FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,18 +6,29 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import init_db
-from .routers import auth, license, team
+from .routers import (
+    admin,
+    auth,
+    files,
+    findings,
+    license,
+    reports,
+    team,
+    verifications,
+)
 from .seed import seed_data
+from .storage import ensure_dir
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     seed_data()
+    ensure_dir(settings.STORAGE_DIR)
     yield
 
 
-app = FastAPI(title=settings.PROJECT_NAME, version="0.2.0", lifespan=lifespan)
+app = FastAPI(title=settings.PROJECT_NAME, version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +44,12 @@ def health():
     return {"status": "ok", "service": settings.PROJECT_NAME}
 
 
-app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-app.include_router(license.router, prefix=settings.API_V1_PREFIX)
-app.include_router(team.router, prefix=settings.API_V1_PREFIX)
+api = settings.API_V1_PREFIX
+app.include_router(auth.router, prefix=api)
+app.include_router(license.router, prefix=api)
+app.include_router(team.router, prefix=api)
+app.include_router(files.router, prefix=api)
+app.include_router(verifications.router, prefix=api)
+app.include_router(findings.router, prefix=api)
+app.include_router(reports.router, prefix=api)
+app.include_router(admin.router, prefix=api)

@@ -50,3 +50,26 @@ def require_roles(*roles: str):
         return user
 
     return checker
+
+
+def require_active_license(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> User:
+    """Ensure the user's company has an ACTIVE, unexpired license."""
+    from datetime import datetime, timezone
+
+    from .models import License, LicenseStatus
+
+    if not user.company_id:
+        raise HTTPException(status_code=403, detail="No company associated with account")
+    lic = (
+        db.query(License)
+        .filter(License.company_id == user.company_id)
+        .order_by(License.created_at.desc())
+        .first()
+    )
+    if lic is None or lic.status != LicenseStatus.ACTIVE:
+        raise HTTPException(status_code=402, detail="Active license required")
+    if lic.expires_at and lic.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=402, detail="License expired")
+    return user

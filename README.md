@@ -1,116 +1,149 @@
 # Papery
 
 **AI-powered document verification platform.** Upload reference and target
-business documents — Papery detects document types, extracts structured fields,
-compares them, highlights mismatches with severity, and generates auditable
-verification reports.
+business documents — Papery extracts the text (OCR when needed), detects the
+document type, pulls out structured fields, compares them, highlights mismatches
+with severity, and generates downloadable verification reports.
 
 First vertical: **Freight Forwarding & Logistics**. Web application only.
 
 ## Status
 
-🟢 **Phase 2 — Project foundation complete.** Authentication, company license
-activation, user roles, landing page, and the dashboard shell are implemented
-and runnable via Docker. OCR and AI are intentionally **not** implemented yet
-(Phases 5–11).
+🟢 **End-to-end working application.** Full flow runs locally with Docker:
+register → activate license → upload documents → automatic
+extract/classify/compare → results with severity → PDF/Excel/JSON reports →
+history & search → admin panel.
 
 Full system design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Tech Stack
 
 - **Frontend:** Next.js 15, React 19, TypeScript, TailwindCSS, next-themes
-- **Backend:** Python, FastAPI, SQLAlchemy
-- **Database:** PostgreSQL
-- **Auth:** JWT (access + refresh), bcrypt
-- **Containers:** Docker + Docker Compose
+- **Backend:** Python, FastAPI, SQLAlchemy, background-task pipeline
+- **Document understanding:** PyMuPDF (PDF text), Tesseract OCR (scans/images),
+  python-docx, RapidFuzz (fuzzy matching), schema-driven extraction
+- **Reports:** ReportLab (PDF), openpyxl (Excel), JSON
+- **Database:** PostgreSQL · **Auth:** JWT + bcrypt · **Containers:** Docker
 
-## What's implemented in Phase 2
+> **What is intentionally simplified (with clear seams in the code):**
+> processing uses FastAPI background tasks instead of Celery/Redis; files are
+> stored on a local volume instead of S3; OCR uses Tesseract (PaddleOCR is the
+> production engine); the semantic LLM comparison step is a disabled-by-default
+> hook (deterministic matching covers the core). The app runs fully **without
+> any API keys**.
 
-- Landing page (hero, features, how-it-works, pricing, FAQ) — responsive
-- Login & Register pages
-- Dashboard layout with sidebar + top navigation (responsive, mobile drawer)
-- Dark / Light mode (system-aware, toggle persists)
-- JWT authentication (register, login, refresh, me, logout)
-- Company license activation with seeded demo keys
-- Role-based access control (Admin, Manager, Staff, + platform Super Admin)
-- Team management (add members, change roles, enable/disable) with seat limits
+## Features
+
+- Responsive landing page, dark / light mode
+- JWT auth (register, login, refresh) + company license activation
+- Roles: Admin, Manager, Staff (+ platform Super Admin) with RBAC
+- Document upload (PDF, DOCX, PNG, JPG, JPEG, TIFF), reference vs target
+- Automatic pipeline: text extraction → OCR fallback → classification →
+  field extraction → comparison → severity (Critical / Major / Minor)
+- Smart matching: number/date/whitespace normalization, OCR-confusion
+  awareness (O/0, I/1, S/5, B/8), fuzzy similarity
+- Results: split-screen field comparison + findings with explanations and
+  suggested fixes; accept / dismiss actions
+- Reports: download PDF, Excel, JSON
+- History with search & filters; per-row drill-down
+- Learning mode: dismissals/corrections captured as feedback for admin review
+- Audit trail on key actions; usage quota & seat-limit enforcement
+- Admin panel: companies, licenses (generate keys), plans, usage, MRR
 
 ---
 
-## Run locally with Docker (recommended)
+## Run locally with Docker
 
-**Prerequisites:** Docker + Docker Compose.
+**Prerequisites:** Docker + Docker Compose. From the repo root:
 
 ```bash
-# from the repository root
 docker compose up --build
 ```
 
-This starts three containers:
+| Service  | URL                       | Notes                              |
+|----------|---------------------------|------------------------------------|
+| Frontend | http://localhost:3000     | Next.js web app                    |
+| Backend  | http://localhost:8000     | FastAPI (interactive docs `/docs`) |
+| Database | localhost:5432            | PostgreSQL (`papery`/`papery`)     |
 
-| Service  | URL                            | Notes                          |
-|----------|--------------------------------|--------------------------------|
-| Frontend | http://localhost:3000          | Next.js web app                |
-| Backend  | http://localhost:8000          | FastAPI (docs at `/docs`)      |
-| Database | localhost:5432                 | PostgreSQL (`papery`/`papery`) |
+### Full walkthrough
 
-The backend waits for PostgreSQL, creates tables, and seeds plans + demo
-license keys on first startup.
+1. Open **http://localhost:3000** → **Sign up** (you become the company Admin).
+2. Activate with a demo license key (clickable on the activation page):
+   - `PAPERY-FREE-DEMO-2026` · `PAPERY-PRO-DEMO-2026` · `PAPERY-ENT-DEMO-2026`
+3. Go to **New Verification**, give it a title, and upload:
+   - **Reference** document(s) — the source of truth
+   - **Target** document(s) — the document to verify
+   (PDFs with a text layer work fully offline; scanned PDFs/images use OCR.)
+4. Click **Verify** → watch the pipeline run → review the results: a
+   split-screen field comparison and a findings list with severity and
+   suggested fixes.
+5. Download the **PDF / Excel / JSON** report.
+6. Browse **History** to search past verifications; **Team** to manage roles.
 
-### Try it out
+> 💡 No sample documents handy? Any PDF/Word file works. For a meaningful demo,
+> make two PDFs with lines like `Booking No: ABC123`, `Container No: TCLU1234567`,
+> `Gross Weight: 26,557.68 KG` and change a value in the target.
 
-1. Open **http://localhost:3000**.
-2. Click **Sign up** and create an account (this makes you the company **Admin**).
-3. You'll be sent to the **license activation** page. Use a demo key:
-   - `PAPERY-FREE-DEMO-2026` (Free — 50 docs / 3 users)
-   - `PAPERY-PRO-DEMO-2026` (Pro — 500 docs / 10 users)
-   - `PAPERY-ENT-DEMO-2026` (Enterprise — 5000 docs / 100 users)
-4. After activation you reach the **Dashboard**. Visit **Team** to add Manager
-   or Staff members and manage their roles.
-5. Toggle **dark / light mode** from the top bar.
+### Platform super-admin (Admin Panel)
 
-### Seeded platform super-admin
+Seeded for the admin panel: `admin@papery.app` / `Admin123!`.
+Log in to manage companies, generate license keys, and view usage/MRR.
 
-A platform super-admin is seeded for later admin-panel work (Phase 14):
+> ⚠️ All default secrets in compose files are local-dev only — change them
+> before any real deployment.
 
-- Email: `admin@papery.app`
-- Password: `Admin123!`
+### Access from a phone (same Wi-Fi)
 
-> ⚠️ All default secrets/passwords in `docker-compose.yml` are for local
-> development only. Change them before any non-local deployment.
+Set your computer's LAN IP once, then rebuild:
+
+```bash
+cp .env.example .env       # edit HOST_IP to your computer's IP (e.g. 192.168.1.45)
+docker compose up --build
+```
+
+Open `http://<HOST_IP>:3000` on the phone. (Find your IP: macOS
+`ipconfig getifaddr en0`, Windows `ipconfig`, Linux `hostname -I`.)
 
 ### Stop / reset
 
 ```bash
-docker compose down          # stop containers
-docker compose down -v       # stop and wipe the database volume (fresh start)
+docker compose down            # stop
+docker compose down -v         # stop and wipe database + uploaded files
 ```
 
 ---
 
-## Run locally without Docker (manual)
+## Production-style deployment
 
-### Backend
+A hardened stack (Postgres + FastAPI + built Next.js behind **Nginx**, only
+port 80 exposed) is provided:
+
+```bash
+# set strong values first
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+echo "SUPER_ADMIN_PASSWORD=$(openssl rand -base64 18)" >> .env
+echo "PUBLIC_URL=http://localhost" >> .env   # or https://your-domain
+
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+Then open **http://localhost**. For real TLS, terminate HTTPS at Nginx
+(`infra/nginx/nginx.conf`) or run behind a managed load balancer / CDN.
+
+---
+
+## Run tests
 
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-# point at a running PostgreSQL instance
-export DATABASE_URL="postgresql+psycopg2://papery:papery@localhost:5432/papery"
-uvicorn app.main:app --reload --port 8000
+pip install -r requirements.txt pytest
+pytest -q
 ```
 
-### Frontend
-
-```bash
-cd frontend
-npm install
-export NEXT_PUBLIC_API_URL="http://localhost:8000"
-npm run dev
-```
-
-Open http://localhost:3000.
+The suite covers the document-understanding engines: normalization,
+classification, field extraction, and the comparison/severity logic.
 
 ---
 
@@ -118,52 +151,43 @@ Open http://localhost:3000.
 
 ```
 Papery/
-├── docker-compose.yml      # db + backend + frontend
-├── docs/ARCHITECTURE.md    # full system design (Phase 1)
-├── backend/                # FastAPI app
+├── docker-compose.yml          # dev: db + backend + frontend
+├── docker-compose.prod.yml     # prod: + nginx, built frontend
+├── infra/nginx/nginx.conf      # reverse proxy
+├── docs/ARCHITECTURE.md        # full system design
+├── backend/                    # FastAPI app
 │   ├── app/
-│   │   ├── main.py         # app factory + startup (init + seed)
-│   │   ├── config.py       # env-driven settings
-│   │   ├── database.py     # engine/session + init
-│   │   ├── models.py       # plans, companies, licenses, users
-│   │   ├── security.py     # bcrypt + JWT
-│   │   ├── deps.py         # auth + RBAC dependencies
-│   │   ├── schemas.py      # Pydantic DTOs
-│   │   ├── services.py     # shared helpers
-│   │   ├── seed.py         # plans + demo licenses + super-admin
-│   │   └── routers/        # auth, license, team
-│   ├── requirements.txt
-│   └── Dockerfile
-└── frontend/               # Next.js 15 app (App Router)
-    ├── src/app/            # routes: /, /login, /register, /activate, /dashboard/*
-    ├── src/components/     # theme, header, dashboard sidebar/topbar
-    ├── src/lib/            # api client, auth context, types
-    └── Dockerfile
+│   │   ├── main.py             # app factory + startup
+│   │   ├── models.py           # all ORM tables
+│   │   ├── doctypes.py         # document types + field catalog (schema-driven)
+│   │   ├── pipeline.py         # verification orchestration (background task)
+│   │   ├── engines/            # text_extract, classify, extract_fields,
+│   │   │                       #   normalize, compare, reports
+│   │   └── routers/            # auth, license, team, files, verifications,
+│   │                           #   findings, reports, admin
+│   └── tests/                  # engine unit tests
+└── frontend/                   # Next.js 15 (App Router)
+    └── src/app/                # /, /login, /register, /activate,
+                                #   /dashboard, /dashboard/verify[/[id]],
+                                #   /dashboard/history, /team, /admin, /settings
 ```
 
-## API overview (Phase 2)
+## API overview
 
-| Method | Path                          | Role          |
-|--------|-------------------------------|---------------|
-| POST   | `/api/v1/auth/register`       | public        |
-| POST   | `/api/v1/auth/login`          | public        |
-| POST   | `/api/v1/auth/refresh`        | public        |
-| GET    | `/api/v1/auth/me`             | authenticated |
-| POST   | `/api/v1/auth/logout`         | authenticated |
-| GET    | `/api/v1/license`             | authenticated |
-| POST   | `/api/v1/license/activate`    | Admin         |
-| GET    | `/api/v1/team/members`        | Admin/Manager |
-| POST   | `/api/v1/team/members`        | Admin         |
-| PATCH  | `/api/v1/team/members/{id}`   | Admin         |
-
-Interactive API docs: **http://localhost:8000/docs**.
+Auth & tenancy: `/auth/*`, `/license/*`, `/team/*`.
+Verification: `POST /files/upload`, `POST /verifications`,
+`GET /verifications` (search), `GET /verifications/{id}`,
+`GET /verifications/{id}/status`, `GET /verifications/{id}/report?fmt=PDF`,
+`PATCH /findings/{id}`. Admin: `/admin/*`. Full docs at
+**http://localhost:8000/docs**.
 
 ## Roadmap
 
-1. ✅ Architecture · 2. ✅ Auth & License (+ landing, dashboard shell) →
-3. Landing Page polish → 4. Dashboard → 5. Upload → 6. OCR →
-7. Classification → 8. Field Extraction → 9. Comparison Engine →
-10. PDF Highlight → 11. Reports → 12. History → 13. Learning Mode →
-14. Admin Panel → 15. Testing → 16. Deployment
+1. ✅ Architecture · 2. ✅ Auth & License · 3. ✅ Landing · 4. ✅ Dashboard ·
+5. ✅ Upload · 6. ✅ OCR/text extraction · 7. ✅ Classification ·
+8. ✅ Field extraction · 9. ✅ Comparison engine · 10. ✅ Results view ·
+11. ✅ Reports · 12. ✅ History · 13. ✅ Learning mode · 14. ✅ Admin panel ·
+15. ✅ Tests · 16. ✅ Deployment (Nginx)
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full roadmap.
+**Next up (production hardening):** Celery/Redis queue, S3 storage, PaddleOCR,
+pixel-level PDF highlight overlay, real email notifications, LLM semantic step.

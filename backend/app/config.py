@@ -1,4 +1,4 @@
-"""Application configuration (Phase 2 foundation).
+"""Application configuration.
 
 Settings are read from environment variables (see docker-compose.yml) with
 sensible local-development defaults so the app is runnable out of the box.
@@ -30,6 +30,13 @@ class Settings(BaseSettings):
 
     # License
     LICENSE_DURATION_DAYS: int = 365
+
+    # File storage (local volume; S3 is the production target)
+    STORAGE_DIR: str = "/app/uploads"
+    MAX_UPLOAD_MB: int = 25
+
+    # Optional LLM semantic-comparison hook. Empty => deterministic-only.
+    OPENAI_API_KEY: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

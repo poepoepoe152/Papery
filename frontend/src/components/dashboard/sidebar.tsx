@@ -4,6 +4,7 @@ import {
   FileCheck2,
   LayoutDashboard,
   Settings,
+  Shield,
   UploadCloud,
   Users,
   History,
@@ -30,6 +31,12 @@ const NAV: NavItem[] = [
     label: "Team",
     icon: Users,
     roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    href: "/dashboard/admin",
+    label: "Admin Panel",
+    icon: Shield,
+    roles: ["SUPER_ADMIN"],
   },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

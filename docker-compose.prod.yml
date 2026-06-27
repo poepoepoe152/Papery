@@ -1,0 +1,57 @@
+# Production-style stack: Postgres + FastAPI + built Next.js behind Nginx.
+# Only Nginx is exposed (port 80). Set strong secrets via a .env file:
+#   JWT_SECRET=...   SUPER_ADMIN_PASSWORD=...   PUBLIC_URL=https://your-domain
+#
+#   docker compose -f docker-compose.prod.yml up --build -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: papery
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-papery}
+      POSTGRES_DB: papery
+    volumes:
+      - papery_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://papery:${POSTGRES_PASSWORD:-papery}@db:5432/papery
+      JWT_SECRET: ${JWT_SECRET:-please-change-me}
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@papery.app}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-Admin123!}
+      STORAGE_DIR: /app/uploads
+    volumes:
+      - papery_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:-http://localhost}
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  papery_pgdata:
+  papery_uploads:
