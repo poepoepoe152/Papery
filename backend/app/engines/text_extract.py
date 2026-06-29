@@ -1,8 +1,11 @@
-"""Text extraction with automatic OCR fallback.
+"""Text extraction with automatic OCR, orientation correction, and preprocessing.
 
 - Digital PDFs: extract the text layer directly (PyMuPDF).
 - Scanned PDFs / images: OCR via Tesseract (PaddleOCR is the production engine;
   Tesseract is the bundled fallback from the architecture's OCR chain).
+- Phone photos are often rotated; standalone images get automatic orientation
+  detection (try 0/90/180/270, keep the most text-like result) plus grayscale +
+  autocontrast, which dramatically improves OCR on real-world captures.
 - DOCX: read paragraphs and tables.
 
 OCR degrades gracefully: if the Tesseract binary is unavailable, extraction
@@ -10,18 +13,60 @@ still returns whatever digital text exists rather than raising.
 """
 import io
 import os
+import re
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"}
+_FINAL_MAX_SIDE = 2400
+_THUMB_MAX_SIDE = 1400
 
 
-def _ocr_image(image) -> str:
+def _word_score(text: str) -> int:
+    return len(re.findall(r"[A-Za-z]{3,}", text))
+
+
+def _ocr_raw(image, config: str = "") -> str:
     try:
         import pytesseract
 
-        return pytesseract.image_to_string(image)
+        return pytesseract.image_to_string(image, config=config)
     except Exception as exc:  # noqa: BLE001 - missing binary or runtime error
         print(f"[ocr] skipped: {exc}")
         return ""
+
+
+def _detect_orientation(image) -> int:
+    """Return the best rotation (degrees) by trying all four on a thumbnail."""
+    try:
+        from PIL import ImageOps
+
+        thumb = image.copy()
+        thumb.thumbnail((_THUMB_MAX_SIDE, _THUMB_MAX_SIDE))
+        thumb = ImageOps.grayscale(thumb)
+    except Exception:  # noqa: BLE001
+        return 0
+
+    best_angle, best_score = 0, -1
+    for angle in (0, 90, 180, 270):
+        rotated = thumb.rotate(-angle, expand=True)
+        score = _word_score(_ocr_raw(rotated, config="--psm 6"))
+        if score > best_score:
+            best_angle, best_score = angle, score
+    return best_angle
+
+
+def _ocr_image(image, detect_orientation: bool = True) -> str:
+    from PIL import ImageOps
+
+    image = ImageOps.exif_transpose(image)
+    if detect_orientation:
+        angle = _detect_orientation(image)
+        if angle:
+            image = image.rotate(-angle, expand=True)
+
+    work = image.copy()
+    work.thumbnail((_FINAL_MAX_SIDE, _FINAL_MAX_SIDE))
+    work = ImageOps.autocontrast(ImageOps.grayscale(work))
+    return _ocr_raw(work)
 
 
 def _extract_pdf(path: str) -> tuple[str, int]:
@@ -33,13 +78,14 @@ def _extract_pdf(path: str) -> tuple[str, int]:
         for page in doc:
             text = page.get_text("text")
             if len(text.strip()) < 20:
-                # Likely a scanned page -> rasterize and OCR.
+                # Likely a scanned page -> rasterize and OCR (orientation from
+                # a PDF render is usually already upright, so skip the 4x scan).
                 try:
                     from PIL import Image
 
                     pix = page.get_pixmap(dpi=200)
                     img = Image.open(io.BytesIO(pix.tobytes("png")))
-                    text = _ocr_image(img)
+                    text = _ocr_image(img, detect_orientation=False)
                 except Exception as exc:  # noqa: BLE001
                     print(f"[ocr] page render failed: {exc}")
             parts.append(text)
@@ -61,7 +107,7 @@ def _extract_image(path: str) -> tuple[str, int]:
     from PIL import Image
 
     with Image.open(path) as img:
-        return _ocr_image(img), 1
+        return _ocr_image(img, detect_orientation=True), 1
 
 
 def extract_text(path: str, original_name: str = "") -> dict:
