@@ -19,7 +19,9 @@ CLASSIFICATION_RULES = [
     ("PURCHASE_ORDER", ["purchase order", "p.o. no", "po number"]),
     ("FREIGHT_REQUEST", ["freight request"]),
     ("CONTRACT", ["contract", "agreement"]),
-    ("INVOICE", ["invoice"]),
+    # multilingual anchors prove the schema-driven design: adding a language
+    # is a config change (fr: facture, de: rechnung, es: factura)
+    ("INVOICE", ["invoice", "facture", "rechnung", "factura"]),
 ]
 
 DOC_TYPE_LABELS = {
@@ -50,7 +52,8 @@ FIELD_CATALOG = {
     },
     "invoice_number": {
         "label": "Invoice Number", "severity": "MAJOR", "kind": "id",
-        "aliases": ["invoice no", "invoice number", "inv no", "invoice #"],
+        "aliases": ["invoice no", "invoice number", "inv no", "invoice #",
+                    "facture n°", "rechnung nr", "factura no"],
     },
     "shipper": {
         "label": "Shipper", "severity": "CRITICAL", "kind": "text",
