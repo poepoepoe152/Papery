@@ -16,6 +16,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -141,6 +142,9 @@ class License(Base, TimestampMixin):
 
 class UsageCounter(Base, TimestampMixin):
     __tablename__ = "usage_counters"
+    __table_args__ = (
+        UniqueConstraint("company_id", "period_start", name="uq_usage_company_period"),
+    )
     id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     period_start = Column(Date, nullable=False)

@@ -11,6 +11,7 @@ from fastapi import (
     Request,
 )
 from sqlalchemy import or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from .. import audit, models, pipeline, schemas
@@ -87,7 +88,9 @@ def create_verification(
     if missing:
         raise HTTPException(status_code=404, detail=f"Unknown file ids: {missing}")
 
-    # Quota enforcement (documents processed this month).
+    # Quota enforcement (documents processed this month). Concurrency-safe:
+    # upsert the period row, then lock it for the check + increment so parallel
+    # requests cannot double-spend the quota or create duplicate counters.
     lic = (
         db.query(models.License)
         .filter(models.License.company_id == current_user.company_id)
@@ -96,21 +99,33 @@ def create_verification(
     )
     limit = lic.plan.monthly_document_limit if lic and lic.plan else None
     period = _usage_period(date.today())
+    n_docs = len(file_ids)
+
+    db.execute(
+        pg_insert(models.UsageCounter)
+        .values(
+            company_id=current_user.company_id,
+            period_start=period,
+            documents_used=0,
+        )
+        .on_conflict_do_nothing(constraint="uq_usage_company_period")
+    )
     counter = (
         db.query(models.UsageCounter)
         .filter(
             models.UsageCounter.company_id == current_user.company_id,
             models.UsageCounter.period_start == period,
         )
-        .first()
+        .with_for_update()
+        .one()
     )
-    used = counter.documents_used if counter else 0
-    n_docs = len(file_ids)
-    if limit is not None and used + n_docs > limit:
+    if limit is not None and counter.documents_used + n_docs > limit:
+        db.rollback()
         raise HTTPException(
             status_code=409,
-            detail=f"Monthly document limit reached ({used}/{limit}).",
+            detail=f"Monthly document limit reached ({counter.documents_used}/{limit}).",
         )
+    counter.documents_used += n_docs
 
     v = models.Verification(
         company_id=current_user.company_id,
@@ -135,13 +150,6 @@ def create_verification(
             verification_id=v.id, file_id=f.id,
             role=models.DocumentRole.TARGET, original_name=f.original_name,
         ))
-
-    if counter is None:
-        counter = models.UsageCounter(
-            company_id=current_user.company_id, period_start=period, documents_used=0
-        )
-        db.add(counter)
-    counter.documents_used = used + n_docs
 
     audit.log(
         db, action="VERIFY_CREATE", user=current_user,
