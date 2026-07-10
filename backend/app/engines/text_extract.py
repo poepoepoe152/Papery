@@ -69,13 +69,14 @@ def _ocr_image(image, detect_orientation: bool = True) -> str:
     return _ocr_raw(work)
 
 
-def _extract_pdf(path: str) -> tuple[str, int]:
+def _extract_pdf(path: str) -> tuple[str, int, list]:
     import fitz  # PyMuPDF
 
     parts: list[str] = []
+    words: list = []  # (page_index, x0, y0, x1, y1, text) for layout-aware extraction
     with fitz.open(path) as doc:
         page_count = doc.page_count
-        for page in doc:
+        for page_index, page in enumerate(doc):
             text = page.get_text("text")
             if len(text.strip()) < 20:
                 # Likely a scanned page -> rasterize and OCR (orientation from
@@ -88,8 +89,11 @@ def _extract_pdf(path: str) -> tuple[str, int]:
                     text = _ocr_image(img, detect_orientation=False)
                 except Exception as exc:  # noqa: BLE001
                     print(f"[ocr] page render failed: {exc}")
+            else:
+                for w in page.get_text("words"):
+                    words.append((page_index, w[0], w[1], w[2], w[3], w[4]))
             parts.append(text)
-    return "\n".join(parts), page_count
+    return "\n".join(parts), page_count, words
 
 
 def _extract_docx(path: str) -> tuple[str, int]:
@@ -111,11 +115,16 @@ def _extract_image(path: str) -> tuple[str, int]:
 
 
 def extract_text(path: str, original_name: str = "") -> dict:
-    """Return {text, page_count, engine}."""
+    """Return {text, page_count, engine, words}.
+
+    `words` holds per-word coordinates for digital PDFs (empty otherwise) and
+    feeds the layout-aware extractor for multi-column forms.
+    """
     ext = os.path.splitext(original_name or path)[1].lower()
+    words: list = []
     try:
         if ext == ".pdf":
-            text, pages = _extract_pdf(path)
+            text, pages, words = _extract_pdf(path)
             engine = "PDF/OCR"
         elif ext == ".docx":
             text, pages = _extract_docx(path)
@@ -129,4 +138,4 @@ def extract_text(path: str, original_name: str = "") -> dict:
         print(f"[extract] failed for {original_name}: {exc}")
         text, pages, engine = "", 0, "ERROR"
 
-    return {"text": text or "", "page_count": pages, "engine": engine}
+    return {"text": text or "", "page_count": pages, "engine": engine, "words": words}

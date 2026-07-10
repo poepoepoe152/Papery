@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from . import models
 from .database import SessionLocal
 from .doctypes import DOC_TYPE_LABELS
-from .engines import classify, compare, extract_fields, text_extract
+from .engines import classify, compare, extract_fields, extract_spatial, text_extract
 
 
 def _process_document(doc: models.Document) -> None:
@@ -21,7 +21,17 @@ def _process_document(doc: models.Document) -> None:
     extracted = text_extract.extract_text(file.storage_path, doc.original_name or "")
     text = extracted["text"]
     doc_type, conf = classify.classify(text)
+
+    # Line-based extraction first, then layout-aware (word coordinates) results
+    # override where they are at least as confident — critical for the
+    # multi-column boxed forms used by carriers.
     fields = extract_fields.extract_fields(text)
+    for key, value in extract_spatial.extract_fields_spatial(
+        extracted.get("words") or []
+    ).items():
+        current = fields.get(key)
+        if current is None or value["confidence"] >= current["confidence"]:
+            fields[key] = value
 
     doc.text = text[:200_000]  # cap stored text
     doc.page_count = extracted["page_count"]
