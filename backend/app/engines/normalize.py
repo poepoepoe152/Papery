@@ -20,8 +20,10 @@ def normalize_text(value: str) -> str:
     if value is None:
         return ""
     v = value.lower().strip()
-    v = re.sub(r"\s+", " ", v)
-    v = v.strip(" .,:;-\t")
+    # Punctuation -> space so "CO., LTD" and "CO.,LTD" compare equal, then
+    # collapse whitespace. Keeps letters/digits (incl. non-ASCII) intact.
+    v = re.sub(r"[^\w\s]", " ", v)
+    v = re.sub(r"\s+", " ", v).strip()
     return v
 
 
@@ -69,6 +71,55 @@ def normalize_date(value: str) -> str:
         return dt.strftime("%Y-%m-%d")
     except (ValueError, OverflowError):
         return normalize_text(value)
+
+
+def _parse_date(value: str, dayfirst: bool):
+    try:
+        return date_parser.parse(value, dayfirst=dayfirst, fuzzy=True).date()
+    except (ValueError, OverflowError, TypeError):
+        return None
+
+
+def _date_candidates(value: str) -> set:
+    """All plausible dates for a string across day/month conventions."""
+    out = set()
+    for dayfirst in (False, True):
+        d = _parse_date(value, dayfirst)
+        if d is not None:
+            out.add(d)
+    return out
+
+
+def _unambiguous_date(value: str):
+    """Return the single forced date if the string admits only one reading
+    (ISO YYYY-MM-DD, a spelled-out month, or a day component > 12), else None."""
+    if value is None:
+        return None
+    if re.search(r"\b\d{4}-\d{1,2}-\d{1,2}\b", value):
+        return _parse_date(value, False)
+    if re.search(r"[A-Za-z]{3,}", value):  # month name present
+        return _parse_date(value, False)
+    two_digit = [int(n) for n in re.findall(r"\b\d{1,2}\b", value)]
+    if any(12 < n <= 31 for n in two_digit):
+        return _parse_date(value, False)
+    return None
+
+
+def dates_equivalent(a: str, b: str) -> bool:
+    """True if two date strings denote the same calendar day.
+
+    Resolves ISO-vs-slash format differences ('2026-02-10' == '10/02/2026')
+    by anchoring on whichever side is unambiguous. When BOTH sides are
+    ambiguous slash dates, it does NOT mask a day/month swap — it requires
+    agreement under a single fixed convention."""
+    ua, ub = _unambiguous_date(a), _unambiguous_date(b)
+    if ua is not None and ub is not None:
+        return ua == ub
+    if ua is not None:
+        return ua in _date_candidates(b)
+    if ub is not None:
+        return ub in _date_candidates(a)
+    return _parse_date(a, False) is not None and _parse_date(a, False) == _parse_date(b, False)
 
 
 def normalize(value: str, kind: str) -> str:

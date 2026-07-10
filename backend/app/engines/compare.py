@@ -46,6 +46,12 @@ def _compare_pair(field_key: str, ref_raw: str, ref_norm: str, tgt_raw: str, tgt
                 "explanation": "Formatting differs but values are identical.",
                 "suggested_fix": None, "is_problem": False}
 
+    # 1b) date equivalence (ISO vs slash formats denote the same day).
+    if meta.get("kind") == "date" and norm.dates_equivalent(ref_raw, tgt_raw):
+        return {"match_type": "NORMALIZED", "severity": "MINOR", "confidence": 0.98,
+                "explanation": "Same date written in a different format.",
+                "suggested_fix": None, "is_problem": False}
+
     # 2) OCR-confusion aware.
     if norm.ocr_normalize(ref_norm) == norm.ocr_normalize(tgt_norm):
         return {"match_type": "FUZZY", "severity": sev, "confidence": 0.7,
