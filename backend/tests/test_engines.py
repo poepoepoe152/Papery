@@ -92,3 +92,13 @@ def test_compare_missing_field():
     tgt = {}
     findings = compare.compare(ref, tgt)
     assert findings[0]["match_type"] == "MISSING"
+
+
+def test_document_title_does_not_create_phantom_id_field():
+    """'BOOKING CONFIRMATION' as a heading must not yield booking_number=CONFIRMATION."""
+    fields = ef.extract_fields("BOOKING CONFIRMATION\nShipper: ACME CO\nConsignee: GLOBEX")
+    assert "booking_number" not in fields
+    # numeric/id fields require a digit
+    fields2 = ef.extract_fields("Seal No: SEALED\nContainer No: TCLU1234567")
+    assert "seal_number" not in fields2  # "SEALED" has no digit
+    assert fields2["container_number"]["normalized"] == "TCLU1234567"

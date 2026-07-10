@@ -69,6 +69,13 @@ def extract_fields(text: str) -> dict[str, dict]:
         normalized = norm.normalize(best_value, meta["kind"])
         if not normalized:
             continue
+        # Numeric/identifier/date fields must contain a digit — this rejects
+        # phantom matches where a bare alias (e.g. "Booking" in the title
+        # "BOOKING CONFIRMATION") captures an all-letters word.
+        if meta["kind"] in ("id", "number", "container", "date") and not any(
+            ch.isdigit() for ch in normalized
+        ):
+            continue
         confidence = 0.9 if best_alias_len >= 6 else 0.75
         result[field_key] = {
             "raw": best_value,
