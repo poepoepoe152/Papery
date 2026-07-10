@@ -200,9 +200,12 @@ def extract_fields_spatial(words: list) -> dict[str, dict]:
                 cand, conf = same, 0.95
             elif _valid(below, meta["kind"]):
                 cand, conf = below, 0.9
-            elif same:
+            elif meta["kind"] == "text" and same:
+                # low-confidence fallback only for free-text fields; id/number/
+                # date/container must pass validation (e.g. contain a digit) so
+                # a heading word never becomes a phantom identifier
                 cand, conf = same, 0.5
-            elif below:
+            elif meta["kind"] == "text" and below:
                 cand, conf = below, 0.45
             else:
                 continue
