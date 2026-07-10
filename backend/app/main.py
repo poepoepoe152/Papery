@@ -25,6 +25,9 @@ async def lifespan(app: FastAPI):
     init_db()
     seed_data()
     ensure_dir(settings.STORAGE_DIR)
+    from .pipeline import recover_interrupted
+
+    recover_interrupted()
     yield
 
 

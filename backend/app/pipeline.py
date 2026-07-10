@@ -147,3 +147,33 @@ def _notify(db, v) -> None:
 
 def doc_type_label(doc_type: str) -> str:
     return DOC_TYPE_LABELS.get(doc_type or "UNKNOWN", doc_type or "Unknown")
+
+
+def recover_interrupted() -> None:
+    """Fail verifications left QUEUED/PROCESSING by a crash or restart.
+
+    Background tasks die with the process, so anything still in-flight at
+    startup can never finish. (A durable queue replaces this in production;
+    with a single app process, everything in-flight at boot is ours.)
+    """
+    db = SessionLocal()
+    try:
+        stale = (
+            db.query(models.Verification)
+            .filter(models.Verification.status.in_(
+                [models.VerificationStatus.QUEUED, models.VerificationStatus.PROCESSING]
+            ))
+            .all()
+        )
+        for v in stale:
+            v.status = models.VerificationStatus.FAILED
+            v.stage = "FAILED"
+            v.error_message = (
+                "Processing was interrupted by a server restart. "
+                "Please run this verification again."
+            )
+        if stale:
+            print(f"[recovery] marked {len(stale)} interrupted verification(s) as FAILED")
+        db.commit()
+    finally:
+        db.close()
