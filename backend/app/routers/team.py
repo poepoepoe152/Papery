@@ -37,6 +37,13 @@ def create_member(
     if body.role not in _NEW_MEMBER_ROLES:
         raise HTTPException(status_code=400, detail="Role must be MANAGER or STAFF")
 
+    # Serialize concurrent invites for this company by locking the company row,
+    # so the seat count + insert are consistent and parallel requests cannot
+    # exceed the plan's max_users.
+    db.query(models.Company).filter(
+        models.Company.id == current_user.company_id
+    ).with_for_update().first()
+
     # Enforce plan seat limit.
     info = services.get_license_info(db, current_user.company_id)
     if info and info.max_users is not None:
@@ -49,6 +56,7 @@ def create_member(
             .count()
         )
         if active_count >= info.max_users:
+            db.rollback()
             raise HTTPException(
                 status_code=409, detail="Maximum number of users for your plan reached"
             )
