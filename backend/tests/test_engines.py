@@ -11,6 +11,14 @@ def test_number_normalization_ignores_formatting():
     assert norm.normalize_number("1,000") == "1000"
 
 
+def test_number_normalization_us_vs_eu_grouping():
+    # EU decimal-comma grouping resolves to the same value as US grouping
+    assert norm.normalize_number("1.000,50") == norm.normalize_number("1,000.50")
+    assert norm.normalize_number("1.234.567,89") == "1234567.89"
+    assert norm.normalize_number("60,00") == "60"  # EU decimal comma
+    assert norm.normalize_number("1,000") == "1000"  # US thousands (3 digits)
+
+
 def test_date_normalization():
     assert norm.normalize_date("2026-01-05") == "2026-01-05"
     assert norm.normalize_date("Jan 5, 2026") == "2026-01-05"

@@ -53,7 +53,12 @@ meant to be reproducible and extended as the product grows.
    alerts)*
 4. **Phantom id fields** — a heading like "BOOKING CONFIRMATION" made the bare
    "booking" alias capture "CONFIRMATION". id/number/date fields now require a
-   digit. *(commit: reject digit-less matches)*
+   digit — in both the line-based extractor and the layout-aware extractor's
+   low-confidence fallback. *(commits: reject digit-less matches; gate spatial
+   fallback to text-only)*
+5. **Seat-limit race** — concurrent team invites bypassed `max_users` (10
+   parallel creates → 11 users on a 3-seat plan). Fixed by locking the company
+   row before the count + insert. *(commit: concurrency-safe seat-limit)*
 
 ## Reproduce
 

@@ -43,17 +43,36 @@ def normalize_container(value: str) -> str:
     return m.group(0) if m else cleaned
 
 
+def _canonical_number_token(token: str) -> str:
+    """Resolve US ('1,234.50') vs EU ('1.234,50') grouping to a plain float
+    string. When both separators appear, the rightmost is the decimal point.
+    A lone comma with exactly two trailing digits is read as a decimal comma
+    (EU '60,00'); otherwise a lone comma is a thousands separator."""
+    has_dot = "." in token
+    has_comma = "," in token
+    if has_dot and has_comma:
+        if token.rfind(",") > token.rfind("."):  # EU: comma is decimal
+            token = token.replace(".", "").replace(",", ".")
+        else:  # US: dot is decimal
+            token = token.replace(",", "")
+    elif has_comma:
+        after = token.split(",")[-1]
+        if token.count(",") == 1 and len(after) == 2:
+            token = token.replace(",", ".")  # EU decimal comma
+        else:
+            token = token.replace(",", "")  # thousands separators
+    return token
+
+
 def normalize_number(value: str) -> str:
-    """Extract the first numeric token and drop thousands separators and
-    trailing zeros so '26,557.680' == '26557.68'."""
+    """Extract the first numeric token and normalize grouping + trailing zeros
+    so '26,557.680' == '26557.68' and '1.000,50' == '1000.5'."""
     if value is None:
         return ""
     m = _NUMBER_RE.search(value.replace(" ", ""))
     if not m:
         return normalize_text(value)
-    token = m.group(0)
-    # Treat commas as thousands separators.
-    token = token.replace(",", "")
+    token = _canonical_number_token(m.group(0))
     try:
         num = float(token)
     except ValueError:
