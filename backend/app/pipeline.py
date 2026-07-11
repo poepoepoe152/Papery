@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from . import models
 from .database import SessionLocal
-from .doctypes import DOC_TYPE_LABELS
+from .doctypes import DOC_TYPE_LABELS, FIELD_CATALOG
 from .engines import classify, compare, extract_fields, extract_spatial, text_extract
 
 
@@ -24,14 +24,35 @@ def _process_document(doc: models.Document) -> None:
 
     # Line-based extraction first, then layout-aware (word coordinates) results
     # override where they are at least as confident — critical for the
-    # multi-column boxed forms used by carriers.
-    fields = extract_fields.extract_fields(text)
-    for key, value in extract_spatial.extract_fields_spatial(
-        extracted.get("words") or []
-    ).items():
-        current = fields.get(key)
-        if current is None or value["confidence"] >= current["confidence"]:
-            fields[key] = value
+    # multi-column boxed forms used by carriers. Multi-valued fields (e.g. all
+    # container/seal numbers) union their values from both extractors.
+    line_fields = extract_fields.extract_fields(text)
+    spatial_fields = extract_spatial.extract_fields_spatial(extracted.get("words") or [])
+    fields: dict = {}
+    for key in set(line_fields) | set(spatial_fields):
+        meta = FIELD_CATALOG.get(key, {})
+        lf, sf = line_fields.get(key), spatial_fields.get(key)
+        if meta.get("multi"):
+            bucket: dict[str, str] = {}
+            for src in (lf, sf):
+                if not src:
+                    continue
+                vals = src.get("values") or [
+                    {"raw": src["raw"], "normalized": src["normalized"]}
+                ]
+                for v in vals:
+                    bucket.setdefault(v["normalized"], v["raw"])
+            values = [{"raw": r, "normalized": n} for n, r in bucket.items()]
+            fields[key] = {
+                "raw": values[0]["raw"],
+                "normalized": values[0]["normalized"],
+                "confidence": 0.92,
+                "values": values,
+            }
+        elif sf and (lf is None or sf["confidence"] >= lf["confidence"]):
+            fields[key] = sf
+        else:
+            fields[key] = lf
 
     doc.text = text[:200_000]  # cap stored text
     doc.page_count = extracted["page_count"]

@@ -77,6 +77,77 @@ def _compare_pair(field_key: str, ref_raw: str, ref_norm: str, tgt_raw: str, tgt
             "suggested_fix": ref_raw, "is_problem": True}
 
 
+def _values_of(entry: dict) -> list[dict]:
+    if not entry:
+        return []
+    return entry.get("values") or [
+        {"raw": entry["raw"], "normalized": entry["normalized"]}
+    ]
+
+
+def _compare_multi(field_key: str, ref: dict, tgt: dict) -> list[dict]:
+    """Set comparison for multi-valued fields (all containers / seals): every
+    reference value must appear in the target; report changed / missing / extra."""
+    label = _label(field_key)
+    sev = _severity(field_key)
+    ref_vals = _values_of(ref)
+    tgt_vals = list(_values_of(tgt))
+    findings: list[dict] = []
+
+    def base(match_type, severity, ref_v, det_v, conf, expl, fix, problem):
+        return {
+            "field_key": field_key, "field_label": label,
+            "reference_value": ref_v, "detected_value": det_v,
+            "match_type": match_type, "severity": severity, "confidence": conf,
+            "used_llm": False, "explanation": expl, "suggested_fix": fix,
+            "is_problem": problem,
+        }
+
+    remaining = tgt_vals[:]
+    unmatched_refs = []
+    # 1) exact (normalized) pairing
+    for rv in ref_vals:
+        hit = next((t for t in remaining if t["normalized"] == rv["normalized"]), None)
+        if hit is not None:
+            remaining.remove(hit)
+        else:
+            unmatched_refs.append(rv)
+
+    # 1b) exactly one value differs on each side -> clearly the same slot changed
+    if len(unmatched_refs) == 1 and len(remaining) == 1:
+        rv, tv = unmatched_refs[0], remaining[0]
+        ocr = norm.ocr_normalize(rv["normalized"]) == norm.ocr_normalize(tv["normalized"])
+        expl = ("Difference matches a common OCR substitution."
+                if ocr else "Value differs from the reference.")
+        return [base("FUZZY", sev, rv["raw"], tv["raw"], 0.7, expl, rv["raw"], True)]
+
+    # 2) fuzzy / OCR pairing for the leftovers
+    for rv in unmatched_refs:
+        if not remaining:
+            findings.append(base("MISSING", sev, rv["raw"], None, 0.9,
+                                 f"{label} not found in target.", rv["raw"], True))
+            continue
+        best = max(remaining, key=lambda t: fuzz.ratio(rv["normalized"], t["normalized"]))
+        ratio = fuzz.ratio(rv["normalized"], best["normalized"])
+        ocr = norm.ocr_normalize(rv["normalized"]) == norm.ocr_normalize(best["normalized"])
+        if ocr or ratio >= FUZZY_THRESHOLD:
+            remaining.remove(best)
+            expl = ("Difference matches a common OCR substitution."
+                    if ocr else f"Values are similar ({ratio:.0f}% match) but not identical.")
+            findings.append(base("FUZZY", sev, rv["raw"], best["raw"],
+                                 0.7 if ocr else ratio / 100.0, expl, rv["raw"], True))
+        else:
+            findings.append(base("MISSING", sev, rv["raw"], None, ratio / 100.0,
+                                 f"{label} not found in target.", rv["raw"], True))
+
+    # 3) any target values left over are extras
+    for t in remaining:
+        findings.append(base("EXTRA", "MINOR", None, t["raw"], 0.6,
+                             f"{label} present in target but not in reference.", None, True))
+
+    return findings
+
+
 def compare(reference_fields: dict, target_fields: dict) -> list[dict]:
     """Return a list of finding dicts comparing target against reference."""
     findings: list[dict] = []
@@ -86,6 +157,11 @@ def compare(reference_fields: dict, target_fields: dict) -> list[dict]:
         ref = reference_fields.get(field_key)
         tgt = target_fields.get(field_key)
         label = _label(field_key)
+
+        if FIELD_CATALOG.get(field_key, {}).get("multi"):
+            if ref or tgt:
+                findings.extend(_compare_multi(field_key, ref, tgt))
+            continue
 
         if ref and not tgt:
             findings.append({

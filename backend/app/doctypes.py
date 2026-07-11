@@ -73,10 +73,12 @@ FIELD_CATALOG = {
     },
     "container_number": {
         "label": "Container Number", "severity": "CRITICAL", "kind": "container",
+        "multi": True,  # a shipment often has several containers
         "aliases": ["container no", "container number", "container/seal", "container"],
     },
     "seal_number": {
         "label": "Seal Number", "severity": "CRITICAL", "kind": "id",
+        "multi": True,
         "aliases": ["seal no", "seal number", "seal"],
     },
     "gross_weight": {

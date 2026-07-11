@@ -40,14 +40,20 @@ DIFF = [
 
 @pytest.mark.parametrize("key,kind,ref,tgt", SAME)
 def test_no_false_positive(key, kind, ref, tgt):
-    f = compare.compare({key: fld(ref, kind)}, {key: fld(tgt, kind)})[0]
-    assert not f["is_problem"], f"nagged on identical values: {ref!r} vs {tgt!r} -> {f['match_type']}"
+    findings = compare.compare({key: fld(ref, kind)}, {key: fld(tgt, kind)})
+    # equal values must not produce any problem finding (multi fields that
+    # match exactly produce no finding at all)
+    assert not any(f["is_problem"] for f in findings), (
+        f"nagged on identical values: {ref!r} vs {tgt!r}"
+    )
 
 
 @pytest.mark.parametrize("key,kind,ref,tgt", DIFF)
 def test_no_false_negative(key, kind, ref, tgt):
-    f = compare.compare({key: fld(ref, kind)}, {key: fld(tgt, kind)})[0]
-    assert f["is_problem"], f"missed a real difference: {ref!r} vs {tgt!r} -> {f['match_type']}"
+    findings = compare.compare({key: fld(ref, kind)}, {key: fld(tgt, kind)})
+    assert any(f["is_problem"] for f in findings), (
+        f"missed a real difference: {ref!r} vs {tgt!r}"
+    )
 
 
 def test_dates_equivalent_direct():
@@ -55,3 +61,37 @@ def test_dates_equivalent_direct():
     assert norm.dates_equivalent("13/02/2026", "2026-02-13")  # day>12 forces reading
     assert not norm.dates_equivalent("2026-02-10", "2026-03-10")
     assert not norm.dates_equivalent("01/02/2026", "02/01/2026")  # swap not masked
+
+
+# --- multi-valued fields (all containers / seals on a B/L) ---
+def _multi(values, kind):
+    vals = [{"raw": v, "normalized": norm.normalize(v, kind)} for v in values]
+    return {"raw": vals[0]["raw"], "normalized": vals[0]["normalized"],
+            "confidence": 0.9, "values": vals}
+
+
+def test_multi_container_all_match():
+    conts = ["CSLU6072845", "TCLU1234567", "MSKU7654321"]
+    findings = compare.compare({"container_number": _multi(conts, "container")},
+                               {"container_number": _multi(conts, "container")})
+    assert not any(f["is_problem"] for f in findings)
+
+
+def test_multi_container_one_wrong_is_caught():
+    ref = ["CSLU6072845", "TCLU1234567", "MSKU7654321"]
+    tgt = ["CSLU6072845", "TCLU1234567", "MSKU7654320"]  # last digit changed
+    findings = compare.compare({"container_number": _multi(ref, "container")},
+                               {"container_number": _multi(tgt, "container")})
+    problems = [f for f in findings if f["is_problem"]]
+    assert len(problems) == 1 and problems[0]["severity"] == "CRITICAL"
+    assert problems[0]["detected_value"] == "MSKU7654320"
+
+
+def test_multi_container_missing_row_is_caught():
+    ref = ["CSLU6072845", "TCLU1234567", "MSKU7654321"]
+    tgt = ["CSLU6072845", "TCLU1234567"]  # a container dropped
+    findings = compare.compare({"container_number": _multi(ref, "container")},
+                               {"container_number": _multi(tgt, "container")})
+    problems = [f for f in findings if f["is_problem"]]
+    assert len(problems) == 1 and problems[0]["match_type"] == "MISSING"
+    assert problems[0]["reference_value"] == "MSKU7654321"

@@ -161,6 +161,47 @@ def _below_value(lines: list[dict], li: int, match: dict,
     return ""
 
 
+def _column_values(lines: list[dict], li: int, match: dict,
+                   matches_per_line: list[list[dict]]) -> list[str]:
+    """Walk down the label's column collecting every cell value (table rows),
+    stopping at another label in the column or a large vertical gap."""
+    base = lines[li]
+    out: list[str] = []
+    prev_y = base["y0"]
+    for lj in range(li + 1, len(lines)):
+        ln = lines[lj]
+        if ln["page"] != base["page"]:
+            break
+        dy = ln["y0"] - prev_y
+        if dy <= 1:
+            continue
+        if dy > 80:  # column ended
+            break
+        bmatches = matches_per_line[lj]
+        start = None
+        for i, w in enumerate(ln["words"]):
+            if match["x0"] - 8 <= w[1] <= match["x1"] + _BELOW_X_SLACK:
+                start = i
+                break
+        if start is None:
+            continue
+        if any(m["start"] <= start <= m["end"] for m in bmatches):
+            break  # a different label heads the column below
+        toks = [ln["words"][start][5]]
+        last_x1 = ln["words"][start][3]
+        for i in range(start + 1, len(ln["words"])):
+            w = ln["words"][i]
+            if any(m["start"] <= i <= m["end"] for m in bmatches):
+                break
+            if w[1] - last_x1 > _JOIN_GAP:
+                break
+            toks.append(w[5])
+            last_x1 = w[3]
+        out.append(_clean(" ".join(toks)))
+        prev_y = ln["y0"]
+    return out
+
+
 def _valid(value: str, kind: str) -> bool:
     if not value:
         return False
@@ -189,6 +230,10 @@ def extract_fields_spatial(words: list) -> dict[str, dict]:
     matches_per_line = [_line_matches(ln) for ln in lines]
 
     result: dict[str, dict] = {}
+    # For multi-valued fields (e.g. container/seal), collect every value on the
+    # document keyed by its normalized form so all table rows are captured.
+    multi: dict[str, dict] = {}
+
     for li, line in enumerate(lines):
         for match in matches_per_line[li]:
             key = match["key"]
@@ -196,37 +241,63 @@ def extract_fields_spatial(words: list) -> dict[str, dict]:
             same = _same_line_value(line, match, matches_per_line[li])
             below = _below_value(lines, li, match, matches_per_line)
 
-            if _valid(same, meta["kind"]):
-                cand, conf = same, 0.95
-            elif _valid(below, meta["kind"]):
-                cand, conf = below, 0.9
-            elif meta["kind"] == "text" and same:
-                # low-confidence fallback only for free-text fields; id/number/
-                # date/container must pass validation (e.g. contain a digit) so
-                # a heading word never becomes a phantom identifier
-                cand, conf = same, 0.5
-            elif meta["kind"] == "text" and below:
-                cand, conf = below, 0.45
+            candidates = []  # (raw, conf) — a table label can head a column of values
+            if meta.get("multi"):
+                if _valid(same, meta["kind"]):
+                    candidates.append((same, 0.95))
+                # collect the whole column of values beneath the label (rows)
+                for col_val in _column_values(lines, li, match, matches_per_line):
+                    if _valid(col_val, meta["kind"]):
+                        candidates.append((col_val, 0.9))
+                if not candidates:
+                    continue
             else:
-                continue
+                if _valid(same, meta["kind"]):
+                    candidates.append((same, 0.95))
+                elif _valid(below, meta["kind"]):
+                    candidates.append((below, 0.9))
+                elif meta["kind"] == "text" and same:
+                    # low-confidence fallback only for free-text fields; id/
+                    # number/date/container must pass validation so a heading
+                    # word never becomes a phantom identifier
+                    candidates.append((same, 0.5))
+                elif meta["kind"] == "text" and below:
+                    candidates.append((below, 0.45))
+                else:
+                    continue
 
-            normalized = norm.normalize(cand, meta["kind"])
-            if not normalized:
-                continue
-            prev = result.get(key)
-            if (
-                prev is None
-                or conf > prev["confidence"]
-                or (conf == prev["confidence"]
-                    and len(match["alias"]) > prev.get("_alias_len", 0))
-            ):
-                result[key] = {
-                    "raw": cand,
-                    "normalized": normalized,
-                    "confidence": conf,
-                    "_alias_len": len(match["alias"]),
-                }
+            for cand, conf in candidates:
+                normalized = norm.normalize(cand, meta["kind"])
+                if not normalized:
+                    continue
+                if meta.get("multi"):
+                    bucket = multi.setdefault(key, {})
+                    if normalized not in bucket:
+                        bucket[normalized] = cand
+                    continue
+                prev = result.get(key)
+                if (
+                    prev is None
+                    or conf > prev["confidence"]
+                    or (conf == prev["confidence"]
+                        and len(match["alias"]) > prev.get("_alias_len", 0))
+                ):
+                    result[key] = {
+                        "raw": cand,
+                        "normalized": normalized,
+                        "confidence": conf,
+                        "_alias_len": len(match["alias"]),
+                    }
 
     for v in result.values():
         v.pop("_alias_len", None)
+
+    for key, bucket in multi.items():
+        values = [{"raw": raw, "normalized": nz} for nz, raw in bucket.items()]
+        result[key] = {
+            "raw": values[0]["raw"],
+            "normalized": values[0]["normalized"],
+            "confidence": 0.92,
+            "values": values,
+        }
     return result
