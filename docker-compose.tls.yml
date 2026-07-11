@@ -1,0 +1,77 @@
+# Production stack with automatic HTTPS via Caddy (Let's Encrypt).
+# Requires a domain pointed at this server. Set in a .env file:
+#   PUBLIC_DOMAIN=app.yourcompany.com
+#   PUBLIC_URL=https://app.yourcompany.com
+#   JWT_SECRET=...            (openssl rand -hex 32)
+#   POSTGRES_PASSWORD=...     (strong)
+#   SUPER_ADMIN_PASSWORD=...  (strong)
+#   # optional email for password reset / invites:
+#   SMTP_HOST= SMTP_PORT= SMTP_USER= SMTP_PASSWORD= SMTP_FROM=
+#
+#   docker compose -f docker-compose.tls.yml up --build -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: papery
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: papery
+    volumes:
+      - papery_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://papery:${POSTGRES_PASSWORD}@db:5432/papery
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      CORS_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL}
+      FRONTEND_URL: ${PUBLIC_URL}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@papery.app}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?set SUPER_ADMIN_PASSWORD}
+      STORAGE_DIR: /app/uploads
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@papery.app}
+    volumes:
+      - papery_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  papery_pgdata:
+  papery_uploads:
+  caddy_data:
+  caddy_config:

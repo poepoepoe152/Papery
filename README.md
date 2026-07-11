@@ -114,22 +114,19 @@ docker compose down -v         # stop and wipe database + uploaded files
 
 ---
 
-## Production-style deployment
+## Production / pilot deployment
 
-A hardened stack (Postgres + FastAPI + built Next.js behind **Nginx**, only
-port 80 exposed) is provided:
+For a real pilot with automatic HTTPS (Caddy + Let's Encrypt), a domain, strong
+secrets, and database backups, follow the step-by-step **[deployment guide](docs/DEPLOY.md)**:
 
 ```bash
-# set strong values first
-echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
-echo "SUPER_ADMIN_PASSWORD=$(openssl rand -base64 18)" >> .env
-echo "PUBLIC_URL=http://localhost" >> .env   # or https://your-domain
-
-docker compose -f docker-compose.prod.yml up --build -d
+# on a server with Docker + a domain pointed at it
+docker compose -f docker-compose.tls.yml up --build -d   # auto-HTTPS via Caddy
 ```
 
-Then open **http://localhost**. For real TLS, terminate HTTPS at Nginx
-(`infra/nginx/nginx.conf`) or run behind a managed load balancer / CDN.
+A plain-HTTP variant behind your own load balancer is also provided
+(`docker-compose.prod.yml`, Nginx on port 80). Database backup/restore scripts
+are in `scripts/` (`backup.sh`, `restore.sh`).
 
 ---
 
