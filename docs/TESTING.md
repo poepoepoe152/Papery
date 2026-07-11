@@ -28,6 +28,10 @@ meant to be reproducible and extended as the product grows.
 - **Match quality:** on a 19-case real-world probe, **0 false positives and
   0 false negatives** (dates in mixed formats, punctuation spacing, OCR
   confusions, fuzzy near-misses).
+- **Multi-container B/Ls:** every container/seal row is extracted and compared
+  as a set, so a wrong/missing/extra container or seal on any row is caught —
+  not just the first row.
+- **Numbers:** US and EU grouping (`1,234.50` and `1.234,50`) normalize equal.
 - **Reports:** PDF, Excel, and JSON contain the correct findings, values,
   severities, and suggested fixes (not just correct MIME types).
 - **Resilience:** killing the server mid-verification leaves an actionable
