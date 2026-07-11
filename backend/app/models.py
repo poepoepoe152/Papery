@@ -151,6 +151,15 @@ class UsageCounter(Base, TimestampMixin):
     documents_used = Column(Integer, nullable=False, default=0)
 
 
+class PasswordReset(Base, TimestampMixin):
+    __tablename__ = "password_resets"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, nullable=False, default=False)
+
+
 class User(Base, TimestampMixin):
     __tablename__ = "users"
     id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)

@@ -158,6 +158,24 @@ def test_verification_and_reports(rid):
     assert api("GET", f"/verifications/{vid}/report?fmt=XLSX", token=A).content[:2] == b"PK"
 
 
+# ---------------- password reset ----------------
+def test_password_reset_no_user_enumeration(rid):
+    email, _ = register(rid, "PW")
+    # same generic response whether or not the email exists
+    r_known = api("POST", "/auth/forgot-password", json={"email": email})
+    r_unknown = api("POST", "/auth/forgot-password", json={"email": f"nobody-{rid}@t.co"})
+    assert r_known.status_code == 200 and r_unknown.status_code == 200
+    assert r_known.json()["message"] == r_unknown.json()["message"]
+    # an invalid/garbage token is rejected
+    assert api("POST", "/auth/reset-password",
+               json={"token": "not-a-real-token", "new_password": "NewPass123"}
+               ).status_code == 400
+    # weak new password is rejected by validation
+    assert api("POST", "/auth/reset-password",
+               json={"token": "x" * 40, "new_password": "short"}
+               ).status_code == 422
+
+
 # ---------------- admin ----------------
 def test_admin_requires_super_admin(rid):
     _, A = register(rid, "NA")

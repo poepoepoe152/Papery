@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     # License
     LICENSE_DURATION_DAYS: int = 365
 
+    # Password reset + email delivery (optional SMTP; falls back to logging)
+    FRONTEND_URL: str = "http://localhost:3000"
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 60
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "no-reply@papery.app"
+
     # File storage (local volume; S3 is the production target)
     STORAGE_DIR: str = "/app/uploads"
     MAX_UPLOAD_MB: int = 25

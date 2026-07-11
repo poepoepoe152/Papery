@@ -1,10 +1,16 @@
 """Password hashing and JWT token helpers."""
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
 
 from .config import settings
+
+
+def hash_token(token: str) -> str:
+    """Deterministic hash for lookup of single-use tokens (password resets)."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 # bcrypt operates on at most 72 bytes; truncate defensively.
 _BCRYPT_MAX_BYTES = 72
