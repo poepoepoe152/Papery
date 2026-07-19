@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { BootScene } from "../scenes/BootScene";
 import { OfficeScene } from "../scenes/OfficeScene";
+import { UIScene } from "../scenes/UIScene";
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -20,5 +21,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, OfficeScene],
+  scene: [BootScene, OfficeScene, UIScene],
 };

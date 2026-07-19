@@ -126,6 +126,212 @@ function generateRugTexture(scene: Phaser.Scene): void {
   g.destroy();
 }
 
+function generateWhiteboardTexture(scene: Phaser.Scene): void {
+  const w = TILE_SIZE * 2;
+  const h = Math.floor(TILE_SIZE * 1.1);
+  const g = newGraphics(scene);
+  g.fillStyle(0x7a5638, 1);
+  g.fillRoundedRect(0, 0, w, h, 4);
+  g.fillStyle(0xf5f1e6, 1);
+  g.fillRoundedRect(4, 4, w - 8, h - 8, 2);
+  g.lineStyle(1, 0xd8cfb8, 1);
+  g.strokeRoundedRect(4, 4, w - 8, h - 8, 2);
+  g.generateTexture("tex-whiteboard", w, h);
+  g.destroy();
+}
+
+function generateCorkboardTexture(scene: Phaser.Scene): void {
+  const w = Math.floor(TILE_SIZE * 1.3);
+  const h = Math.floor(TILE_SIZE * 1.1);
+  const g = newGraphics(scene);
+  g.fillStyle(0x8a6a3f, 1);
+  g.fillRoundedRect(0, 0, w, h, 4);
+  g.fillStyle(0xc9a06a, 1);
+  g.fillRoundedRect(4, 4, w - 8, h - 8, 2);
+  const notes = [0xe6c15c, 0xe07a5f, 0x81b29a];
+  const positions = [
+    [10, 10],
+    [w - 26, 8],
+    [16, h - 26],
+  ];
+  for (let i = 0; i < notes.length; i++) {
+    g.fillStyle(notes[i], 1);
+    g.fillRect(positions[i][0], positions[i][1], 16, 14);
+  }
+  g.generateTexture("tex-corkboard", w, h);
+  g.destroy();
+}
+
+function generateWindowTexture(scene: Phaser.Scene): void {
+  const w = TILE_SIZE * 2;
+  const h = Math.floor(TILE_SIZE * 1.3);
+  const g = newGraphics(scene);
+  g.fillStyle(0x8a5a34, 1);
+  g.fillRoundedRect(0, 0, w, h, 4);
+  g.fillStyle(0x8fc7e8, 1);
+  g.fillRect(6, 6, w - 12, h - 12);
+  g.fillStyle(0xbfe0f2, 1);
+  g.fillEllipse(w * 0.3, h * 0.35, 22, 10);
+  g.fillEllipse(w * 0.68, h * 0.28, 18, 8);
+  g.fillStyle(0x4f9457, 1);
+  g.fillTriangle(w * 0.22, h - 8, w * 0.35, h - 30, w * 0.48, h - 8);
+  g.fillStyle(0x3f7d4a, 1);
+  g.fillTriangle(w * 0.55, h - 8, w * 0.68, h - 24, w * 0.81, h - 8);
+  g.lineStyle(3, 0x8a5a34, 1);
+  g.lineBetween(w / 2, 6, w / 2, h - 6);
+  g.lineBetween(6, h / 2, w - 6, h / 2);
+  g.generateTexture("tex-window", w, h);
+  g.destroy();
+}
+
+function generateBookshelfTexture(scene: Phaser.Scene): void {
+  const w = TILE_SIZE * 2;
+  const h = TILE_SIZE * 2;
+  const g = newGraphics(scene);
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(w / 2, h - 3, w - 10, 6);
+  g.fillStyle(0x6e4526, 1);
+  g.fillRoundedRect(0, 0, w, h - 4, 3);
+  g.fillStyle(0x4a2f19, 1);
+  g.fillRect(4, 4, w - 8, h - 12);
+
+  const bookColors = [0xc44536, 0x4f7cac, 0x81b29a, 0xe6c15c, 0x9a6fb0, 0xe07a5f];
+  const shelfYs = [8, h / 2 - 4];
+  for (const shelfY of shelfYs) {
+    let x = 8;
+    let i = 0;
+    while (x < w - 12) {
+      const bw = 5 + (i % 3);
+      g.fillStyle(bookColors[i % bookColors.length], 1);
+      g.fillRect(x, shelfY, bw, 24);
+      x += bw + 1;
+      i++;
+    }
+    g.fillStyle(0x2f1d0f, 1);
+    g.fillRect(4, shelfY + 26, w - 8, 3);
+  }
+  g.generateTexture("tex-bookshelf", w, h);
+  g.destroy();
+}
+
+function generateCoffeeStationTexture(scene: Phaser.Scene): void {
+  const w = Math.floor(TILE_SIZE * 1.6);
+  const h = Math.floor(TILE_SIZE * 1.3);
+  const g = newGraphics(scene);
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(w / 2, h - 3, w - 8, 6);
+  g.fillStyle(0x6e4526, 1);
+  g.fillRoundedRect(2, h - 20, w - 4, 18, 3);
+  g.fillStyle(0x2b2b2b, 1);
+  g.fillRoundedRect(8, h - 42, 20, 26, 3);
+  g.fillStyle(0x4a4a4a, 1);
+  g.fillRect(11, h - 38, 14, 8);
+  g.fillStyle(0x2b2b2b, 1);
+  g.fillRect(14, h - 30, 8, 10);
+  g.fillStyle(0xd9d2c4, 1);
+  g.fillRect(w - 20, h - 24, 10, 12);
+  g.fillStyle(0x6e4526, 1);
+  g.fillRect(w - 18, h - 22, 6, 8);
+  g.generateTexture("tex-coffee-station", w, h);
+  g.destroy();
+}
+
+function generateCouchTexture(scene: Phaser.Scene): void {
+  const w = TILE_SIZE * 3;
+  const h = Math.floor(TILE_SIZE * 1.4);
+  const g = newGraphics(scene);
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(w / 2, h - 3, w - 12, 8);
+  g.fillStyle(0xcfc8ba, 1);
+  g.fillRoundedRect(0, 6, w, h - 14, 8);
+  g.fillStyle(0xe4ded1, 1);
+  g.fillRoundedRect(6, 0, w - 12, h * 0.55, 6);
+  const cushionW = (w - 24) / 3;
+  for (let i = 0; i < 3; i++) {
+    g.fillStyle(0xdcd5c6, 1);
+    g.fillRoundedRect(12 + i * (cushionW + 4), h * 0.3, cushionW, h * 0.4, 4);
+  }
+  g.fillStyle(0xc44536, 1);
+  g.fillRoundedRect(14, h * 0.32, 14, 14, 3);
+  g.generateTexture("tex-couch", w, h);
+  g.destroy();
+}
+
+function generateCoffeeTableTexture(scene: Phaser.Scene): void {
+  const w = Math.floor(TILE_SIZE * 1.6);
+  const h = Math.floor(TILE_SIZE * 0.9);
+  const g = newGraphics(scene);
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(w / 2, h - 2, w - 8, 6);
+  g.fillStyle(0x8a5a34, 1);
+  g.fillRoundedRect(0, 0, w, h - 8, 4);
+  g.lineStyle(1, 0x5c3b1e, 1);
+  g.strokeRoundedRect(0, 0, w, h - 8, 4);
+  g.fillStyle(0x6e4526, 1);
+  g.fillRect(4, h - 8, 4, 8);
+  g.fillRect(w - 8, h - 8, 4, 8);
+  g.fillStyle(0xd9d2c4, 1);
+  g.fillRect(w / 2 - 8, 4, 12, 8);
+  g.generateTexture("tex-coffee-table", w, h);
+  g.destroy();
+}
+
+function generateSecondRugTexture(scene: Phaser.Scene): void {
+  const w = TILE_SIZE * 3;
+  const h = TILE_SIZE * 2;
+  const g = newGraphics(scene);
+  g.fillStyle(0x5c7a8a, 0.5);
+  g.fillRoundedRect(0, 0, w, h, 10);
+  g.lineStyle(3, 0x466170, 0.5);
+  g.strokeRoundedRect(4, 4, w - 8, h - 8, 8);
+  g.generateTexture("tex-rug-2", w, h);
+  g.destroy();
+}
+
+function generatePetBedTexture(scene: Phaser.Scene): void {
+  const w = 36;
+  const h = 28;
+  const g = newGraphics(scene);
+  g.fillStyle(0x000000, 0.2);
+  g.fillEllipse(w / 2, h - 3, w - 6, 6);
+  g.fillStyle(0x8a5a34, 1);
+  g.fillEllipse(w / 2, h / 2, w, h - 6);
+  g.fillStyle(0xc9a06a, 1);
+  g.fillEllipse(w / 2, h / 2, w - 10, h - 14);
+  g.generateTexture("tex-pet-bed", w, h);
+  g.destroy();
+}
+
+function generatePetTexture(scene: Phaser.Scene): void {
+  const g = newGraphics(scene);
+  const w = 20;
+  const h = 14;
+  g.fillStyle(0xd68a3c, 1);
+  g.fillEllipse(w / 2, h / 2 + 1, w - 2, h - 4);
+  g.fillStyle(0xb8712c, 1);
+  g.fillEllipse(w * 0.28, h * 0.4, 6, 4);
+  g.fillStyle(0x3a2a1e, 1);
+  g.fillTriangle(w * 0.15, h * 0.25, w * 0.05, h * 0.02, w * 0.3, h * 0.15);
+  g.generateTexture("tex-pet", w, h);
+  g.destroy();
+}
+
+function generateFramedPhotoTexture(scene: Phaser.Scene): void {
+  const w = 26;
+  const h = 22;
+  const g = newGraphics(scene);
+  g.fillStyle(0x6e4526, 1);
+  g.fillRoundedRect(0, 0, w, h, 2);
+  g.fillStyle(0xdce6ef, 1);
+  g.fillRect(3, 3, w - 6, h - 6);
+  g.fillStyle(0xa9c2d9, 1);
+  g.fillRect(3, h - 9, w - 6, 6);
+  g.fillStyle(0xe6c15c, 1);
+  g.fillCircle(w - 8, 8, 3);
+  g.generateTexture("tex-photo", w, h);
+  g.destroy();
+}
+
 function generateShadowTexture(scene: Phaser.Scene): void {
   const g = newGraphics(scene);
   g.fillStyle(0x000000, 0.28);
@@ -141,5 +347,16 @@ export function generateAllTextures(scene: Phaser.Scene): void {
   generateChairTexture(scene);
   generatePlantTexture(scene);
   generateRugTexture(scene);
+  generateSecondRugTexture(scene);
+  generateWhiteboardTexture(scene);
+  generateCorkboardTexture(scene);
+  generateWindowTexture(scene);
+  generateBookshelfTexture(scene);
+  generateCoffeeStationTexture(scene);
+  generateCouchTexture(scene);
+  generateCoffeeTableTexture(scene);
+  generatePetBedTexture(scene);
+  generatePetTexture(scene);
+  generateFramedPhotoTexture(scene);
   generateShadowTexture(scene);
 }
