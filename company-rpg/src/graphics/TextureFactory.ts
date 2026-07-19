@@ -1,16 +1,14 @@
 import Phaser from "phaser";
-import { Direction, TILE_SIZE } from "../constants/Constants";
-import { EMPLOYEES } from "../data/EmployeeData";
+import { TILE_SIZE } from "../constants/Constants";
 
 /**
- * All game art is generated at runtime from vector shapes instead of loaded
- * image files, since no external asset pipeline exists for this milestone.
- * Every texture ends up as a normal key in the texture manager, so the rest
- * of the game (scenes, entities) never knows the art is procedural.
+ * The environment (floor, walls, desks, chairs, plants, rug) is generated at
+ * runtime from vector shapes, since no free furniture asset pack was
+ * available. Character art is real hand-drawn spritesheets loaded from
+ * public/assets/characters — see CREDITS.md and Animations.ts. Every
+ * generated texture ends up as a normal key in the texture manager, so the
+ * rest of the game never knows the environment art is procedural.
  */
-
-const SKIN_TONE = 0xf2c9a1;
-const OUTLINE = 0x2b2118;
 
 /** Cheap deterministic hash so floor variants look random but are stable
  * across reloads (same col/row always picks the same tile variant). */
@@ -128,119 +126,11 @@ function generateRugTexture(scene: Phaser.Scene): void {
   g.destroy();
 }
 
-interface CharacterFrameOptions {
-  key: string;
-  bodyColor: number;
-  facing: Direction;
-  bobPx: number;
-  footSpreadPx: number;
-  seated: boolean;
-}
-
-const CHAR_W = 32;
-const CHAR_H = 40;
-
-function drawCharacterFrame(g: Phaser.GameObjects.Graphics, opts: CharacterFrameOptions): void {
-  const { bodyColor, facing, bobPx, footSpreadPx, seated } = opts;
-  const cx = CHAR_W / 2;
-  const bodyTop = (seated ? 16 : 14) + bobPx;
-  const bodyBottom = 34 + (seated ? -2 : 0);
-  const bodyH = bodyBottom - bodyTop;
-  const headCy = bodyTop - 4;
-
-  // Shadow anchored to the floor regardless of bob so the character never
-  // looks like it floats.
-  g.fillStyle(0x000000, 0.22);
-  g.fillEllipse(cx, 37, 16, 5);
-
-  // Feet peek out below the body only while standing/walking.
-  if (!seated) {
-    g.fillStyle(0x3a2f26, 1);
-    g.fillEllipse(cx - 5 - footSpreadPx, 33, 6, 4);
-    g.fillEllipse(cx + 5 + footSpreadPx, 33, 6, 4);
-  }
-
-  // Body
-  g.fillStyle(bodyColor, 1);
-  g.fillRoundedRect(cx - 9, bodyTop, 18, bodyH, 6);
-  g.lineStyle(1, OUTLINE, 0.4);
-  g.strokeRoundedRect(cx - 9, bodyTop, 18, bodyH, 6);
-
-  // Arms (small side stripes, mostly decorative)
-  g.fillStyle(bodyColor, 1);
-  g.fillRoundedRect(cx - 12, bodyTop + 3, 4, bodyH - 8, 2);
-  g.fillRoundedRect(cx + 8, bodyTop + 3, 4, bodyH - 8, 2);
-
-  // Head
-  g.fillStyle(SKIN_TONE, 1);
-  g.fillCircle(cx, headCy, 7);
-  g.lineStyle(1, OUTLINE, 0.35);
-  g.strokeCircle(cx, headCy, 7);
-
-  // Simple hair cap so the back-of-head (facing up) reads differently
-  // from the face (facing down).
-  g.fillStyle(0x3a2a1e, 1);
-  g.fillEllipse(cx, headCy - 4, 13, 8);
-
-  // Face features, placed according to facing direction.
-  g.fillStyle(OUTLINE, 0.85);
-  if (facing === Direction.Down) {
-    g.fillCircle(cx - 3, headCy + 1, 1.2);
-    g.fillCircle(cx + 3, headCy + 1, 1.2);
-  } else if (facing === Direction.Left) {
-    g.fillCircle(cx - 4, headCy + 1, 1.2);
-  } else if (facing === Direction.Right) {
-    g.fillCircle(cx + 4, headCy + 1, 1.2);
-  }
-  // Direction.Up shows only the hair/back of the head - no face drawn.
-}
-
-function generateCharacterTextures(scene: Phaser.Scene): void {
-  const directions = [Direction.Down, Direction.Up, Direction.Left, Direction.Right];
+function generateShadowTexture(scene: Phaser.Scene): void {
   const g = newGraphics(scene);
-
-  const playerColor = 0xe8b23a;
-  for (const facing of directions) {
-    for (let frame = 0; frame < 2; frame++) {
-      g.clear();
-      drawCharacterFrame(g, {
-        key: "",
-        bodyColor: playerColor,
-        facing,
-        bobPx: frame === 1 ? -1 : 0,
-        footSpreadPx: 0,
-        seated: false,
-      });
-      g.generateTexture(`player-idle-${facing}-${frame}`, CHAR_W, CHAR_H);
-
-      g.clear();
-      drawCharacterFrame(g, {
-        key: "",
-        bodyColor: playerColor,
-        facing,
-        bobPx: frame === 1 ? -1 : 0,
-        footSpreadPx: frame === 1 ? 3 : -3,
-        seated: false,
-      });
-      g.generateTexture(`player-walk-${facing}-${frame}`, CHAR_W, CHAR_H);
-    }
-  }
-
-  for (const employee of EMPLOYEES) {
-    for (let frame = 0; frame < 2; frame++) {
-      g.clear();
-      drawCharacterFrame(g, {
-        key: "",
-        bodyColor: employee.color,
-        facing: employee.facing,
-        bobPx: frame === 1 ? -1 : 0,
-        footSpreadPx: 0,
-        seated: true,
-      });
-      g.generateTexture(`npc-${employee.id}-idle-${frame}`, CHAR_W, CHAR_H);
-    }
-  }
-
+  g.fillStyle(0x000000, 0.28);
+  g.fillEllipse(10, 5, 20, 8);
+  g.generateTexture("tex-shadow", 20, 10);
   g.destroy();
 }
 
@@ -251,7 +141,5 @@ export function generateAllTextures(scene: Phaser.Scene): void {
   generateChairTexture(scene);
   generatePlantTexture(scene);
   generateRugTexture(scene);
-  generateCharacterTextures(scene);
+  generateShadowTexture(scene);
 }
-
-export const CHARACTER_SIZE = { width: CHAR_W, height: CHAR_H };

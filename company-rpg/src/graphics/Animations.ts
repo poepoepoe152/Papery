@@ -1,46 +1,86 @@
 import Phaser from "phaser";
-import { Direction } from "../constants/Constants";
-import { EMPLOYEES } from "../data/EmployeeData";
+import { CHAR_SHEET_COLS, CharacterVariant, Direction } from "../constants/Constants";
 
 /**
- * Builds every animation from the single-frame textures produced by
- * TextureFactory. Phaser allows animation frames to reference different
- * texture keys directly, so no spritesheet packing step is needed.
+ * Builds idle/walk animations for a character spritesheet (see CREDITS.md).
+ * Each sheet is a 7-col x 3-row grid: row 0 faces down, row 1 faces up,
+ * row 2 faces left. There is no dedicated right-facing row - callers mirror
+ * the left-facing animations with sprite.setFlipX(true) instead.
  */
-export function createAnimations(scene: Phaser.Scene): void {
-  const directions = [Direction.Down, Direction.Up, Direction.Left, Direction.Right];
 
-  for (const facing of directions) {
-    scene.anims.create({
-      key: `player-idle-${facing}`,
-      frames: [
-        { key: `player-idle-${facing}-0` },
-        { key: `player-idle-${facing}-1` },
-      ],
-      frameRate: 2,
-      repeat: -1,
-    });
+const ROW = { Down: 0, Up: 1, Left: 2 } as const;
 
-    scene.anims.create({
-      key: `player-walk-${facing}`,
-      frames: [
-        { key: `player-walk-${facing}-0` },
-        { key: `player-walk-${facing}-1` },
-      ],
-      frameRate: 6,
-      repeat: -1,
-    });
+const frame = (row: number, col: number) => row * CHAR_SHEET_COLS + col;
+
+function buildForVariant(scene: Phaser.Scene, variant: CharacterVariant): void {
+  const idleFrameRate = 2;
+  const walkFrameRate = 8;
+
+  scene.anims.create({
+    key: `${variant}-idle-down`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Down, 0), frame(ROW.Down, 1)],
+    }),
+    frameRate: idleFrameRate,
+    repeat: -1,
+  });
+  scene.anims.create({
+    key: `${variant}-walk-down`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Down, 3), frame(ROW.Down, 4)],
+    }),
+    frameRate: walkFrameRate,
+    repeat: -1,
+  });
+
+  scene.anims.create({
+    key: `${variant}-idle-up`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Up, 0), frame(ROW.Up, 1)],
+    }),
+    frameRate: idleFrameRate,
+    repeat: -1,
+  });
+  scene.anims.create({
+    key: `${variant}-walk-up`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Up, 3), frame(ROW.Up, 4)],
+    }),
+    frameRate: walkFrameRate,
+    repeat: -1,
+  });
+
+  scene.anims.create({
+    key: `${variant}-idle-left`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Left, 0), frame(ROW.Left, 1)],
+    }),
+    frameRate: idleFrameRate,
+    repeat: -1,
+  });
+  scene.anims.create({
+    key: `${variant}-walk-left`,
+    frames: scene.anims.generateFrameNumbers(variant, {
+      frames: [frame(ROW.Left, 2), frame(ROW.Left, 3), frame(ROW.Left, 4), frame(ROW.Left, 5)],
+    }),
+    frameRate: walkFrameRate,
+    repeat: -1,
+  });
+}
+
+export function createAnimations(scene: Phaser.Scene, variants: CharacterVariant[]): void {
+  const unique = [...new Set(variants)];
+  for (const variant of unique) {
+    buildForVariant(scene, variant);
   }
+}
 
-  for (const employee of EMPLOYEES) {
-    scene.anims.create({
-      key: `npc-${employee.id}-idle`,
-      frames: [
-        { key: `npc-${employee.id}-idle-0` },
-        { key: `npc-${employee.id}-idle-1` },
-      ],
-      frameRate: 1.5,
-      repeat: -1,
-    });
-  }
+/** The spritesheet has no right-facing row, so Right reuses Left mirrored. */
+export function resolveAnim(
+  variant: CharacterVariant,
+  state: "idle" | "walk",
+  facing: Direction,
+): { key: string; flipX: boolean } {
+  const row = facing === Direction.Right ? Direction.Left : facing;
+  return { key: `${variant}-${state}-${row}`, flipX: facing === Direction.Right };
 }

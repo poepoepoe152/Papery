@@ -1,6 +1,7 @@
 import Phaser from "phaser";
-import { Depth } from "../constants/Constants";
+import { CHAR_DISPLAY_SCALE, Depth } from "../constants/Constants";
 import type { EmployeeConfig } from "../data/EmployeeData";
+import { resolveAnim } from "../graphics/Animations";
 
 /** A seated employee. NPCs don't move in this milestone - workflow/AI comes
  * later - so they only need an idle animation and a name/role label. Desk
@@ -12,11 +13,16 @@ export class NPC extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     this.setDepth(Depth.Characters);
 
-    const sprite = scene.add.sprite(0, 0, `npc-${employee.id}-idle-0`);
-    sprite.setOrigin(0.5, 0.92);
-    sprite.play(`npc-${employee.id}-idle`);
+    const shadow = scene.add.image(0, -2, "tex-shadow");
 
-    const label = scene.add.text(0, -34, `${employee.name}\n${employee.role}`, {
+    const { key, flipX } = resolveAnim(employee.variant, "idle", employee.facing);
+    const sprite = scene.add.sprite(0, 0, employee.variant);
+    sprite.setOrigin(0.5, 1);
+    sprite.setScale(CHAR_DISPLAY_SCALE);
+    sprite.setFlipX(flipX);
+    sprite.play(key);
+
+    const label = scene.add.text(0, -64, `${employee.name}\n${employee.role}`, {
       fontFamily: "monospace",
       fontSize: "10px",
       color: "#ffffff",
@@ -26,6 +32,6 @@ export class NPC extends Phaser.GameObjects.Container {
     });
     label.setOrigin(0.5, 1);
 
-    this.add([sprite, label]);
+    this.add([shadow, sprite, label]);
   }
 }
